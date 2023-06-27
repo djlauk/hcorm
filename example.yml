@@ -1,0 +1,64 @@
+version: "0.1"
+
+typealiases:
+  int_pk: "INTEGER UNSIGNED NOT NULL AUTO_INCREMENT"
+
+columnsets:
+  metadata:
+    - name: "MetaCreatedAt"
+      type: "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+    - name: "MetaLastUpdatedAt"
+      type: "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+    - name: "MetaVersion"
+      type: "INTEGER UNSIGNED NOT NULL DEFAULT 1"
+
+tables:
+
+  SysUser:
+    columns:
+      - name: Login
+        type: "VARCHAR(20) NOT NULL"
+      - name: Email
+        type: "VARCHAR(80) NULL"
+      - name: PasswordHash
+        type: "VARCHAR(200) NULL"
+      - name: "PasswordSetAt"
+        type: "DATETIME NULL"
+      - name: "LastLoginAt"
+        type: "DATETIME NULL"
+      - name: "LastLoginFrom"
+        type: "VARCHAR(50) NULL"
+      - name: "FailedLogins"
+        type: "TINYINT UNSIGNED NOT NULL DEFAULT 0"
+      - name: "LockedOutUntil"
+        type: "DATETIME NULL"
+      - name: "DisabledAt"
+        type: "DATETIME NULL"
+    columnsets:
+      - metadata
+    primarykey: ["Login"]
+
+  SysRole:
+    columns:
+      - name: Name
+        type: "VARCHAR(20) NOT NULL"
+    columnsets:
+      - metadata
+    primarykey: ["Name"]
+
+  SysRoleUser:
+    columns:
+      - name: SysRole
+        type: "VARCHAR(20) NOT NULL"
+      - name: SysUser
+        type: "VARCHAR(20) NOT NULL"
+    columnsets:
+      - metadata
+    primarykey: ["SysRole", "SysUser"]
+    foreignkeys:
+      - column: "SysRole"
+        reftable: "SysRole"
+        refcolumn: "Name"
+      - column: "SysUser"
+        reftable: "SysUser"
+        refcolumn: "Login"
