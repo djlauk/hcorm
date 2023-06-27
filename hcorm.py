@@ -97,7 +97,6 @@ def build_data_model(d: Dict[str, Any]) -> DataModel:
 def build_typealiases(d: Dict[str, str]) -> CaseInsensitiveLookup[str]:
     aliases = CaseInsensitiveLookup()
     for k, v in d.items():
-        print(f"processing {k}")
         aliases[k] = v
     return aliases
 
@@ -197,8 +196,7 @@ def print_sql(model: DataModel, f=sys.stdout):
         tbl = model.tables[tname]
         deps = [model.tables[fk.ref_table].name for fk in tbl.foreign_keys]
         toposort.add(tbl.name, *deps)
-    print("table dependencies:")
-    print(repr(toposort))
+
     for tname in toposort.static_order():
         tbl = model.tables[tname]
         f.write(f"CREATE TABLE `{tname}` (\n")
