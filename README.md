@@ -6,3 +6,10 @@ In many of my applications, I really don't need a full blown ORM. But writing SQ
 
 - The SQL statements to create the table structure.
 - Gateway classes, so your code can use SQL-ish operations, but using code, not strings.
+
+
+## How to use
+
+```sh
+python hcorm.py example.yml
+```
