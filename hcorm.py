@@ -112,7 +112,7 @@ cli.add_command(generatephp)
 cli.add_command(generatesql)
 
 
-def model_from_yaml(fname: str) -> Dict[str, Any]:
+def model_from_yaml(fname: str) -> DataModel:
     with open(fname, "r") as f:
         data = yaml.safe_load(f)
     model = build_data_model(data)
