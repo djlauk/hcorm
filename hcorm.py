@@ -297,7 +297,40 @@ def print_sql(model: DataModel, f=sys.stdout):
 
 
 def print_php(model: DataModel, f=sys.stdout):
-    raise NotImplementedError()
+    ts = strftime(r"%Y-%m-%d %H:%M:%S")
+    f.write(
+        f"""<?php
+//----------------------------------------------------------------------
+// hcorm generated DB gateway classes
+// for details on hcorm see https://github.com/djlauk/hcorm
+//
+// generated on {ts}
+// ----------------------------------------------------------------------
+
+"""
+    )
+    for tname in model.get_tablenames_sorted():
+        f.write(f"/** gateway class for table {tname} */\n")
+        classname = php_name_for_table(tname)
+        f.write(f"class {classname}")
+        f.write("{\n")
+
+        tbl = model.tables[tname]
+        for cname in tbl.columns:
+            fieldname = php_name_for_column(cname)
+            f.write(f"\t${fieldname};\n")
+
+        f.write("}\n\n")
+
+
+def php_name_for_table(tname: str) -> str:
+    # noop for now
+    return tname
+
+
+def php_name_for_column(cname: str) -> str:
+    # noop for now
+    return cname
 
 
 if __name__ == "__main__":
