@@ -322,16 +322,39 @@ def print_php(model: DataModel, f=sys.stdout):
         f.write("{\n")
 
         tbl = model.tables[tname]
-        for cname in tbl.columns:
-            fieldname = php_name_for_column(cname)
-            f.write(f"\t${fieldname};\n")
+        fieldnames = [php_name_for_column(x) for x in tbl.columns]
+        for cname, fieldname in zip(tbl.columns, fieldnames):
+            f.write(f"\tpublic ${fieldname} = null;\n")
+        f.write("\n")
 
+        f.write("\tpublic function toArray() {\n")
+        f.write("\t\treturn array(\n")
+        for cname, fieldname in zip(tbl.columns, fieldnames):
+            f.write(f"\t\t\t'{cname}' => ${fieldname},\n")
+        f.write("\t\t);\n")
+        f.write("\t}\n\n")
+
+        f.write("\tpublic function fromArray($arr) {\n")
+        for cname, fieldname in zip(tbl.columns, fieldnames):
+            f.write(
+                f"\t\t$this->{fieldname} = $arr['{cname}'] ?? $this->{fieldname};\n"
+            )
+        f.write("\t}\n\n")
+
+        f.write(
+            f"""\tpublic static function createFromArray($arr) {{
+\t\t$obj = new {classname}();
+\t\t$obj->fromArray($arr);
+\t\treturn $obj;
+\t}}\n\n"""
+        )
+
+        # end of class
         f.write("}\n\n")
 
 
 def php_name_for_table(tname: str) -> str:
-    # noop for now
-    return tname
+    return tname.capitalize()
 
 
 def php_name_for_column(cname: str) -> str:
