@@ -8,6 +8,7 @@ from typing import Any, Dict, Generic, List, Optional, Sequence, TypeVar
 import sys
 import graphlib
 
+import click
 import yaml
 
 
@@ -75,12 +76,47 @@ class DataModel:
     columnsets: CaseInsensitiveLookup[CaseInsensitiveLookup[DbColumn]]
 
 
-def main():
-    fname = sys.argv[1]
+@click.group()
+def cli():
+    pass
+
+
+@click.group()
+def generate():
+    pass
+
+
+@click.command()
+@click.option("-m", "--model-file")
+def generatesql(model_file):
+    model = model_from_yaml(model_file)
+    print_sql(model)
+
+
+@click.command()
+@click.option("-m", "--model-file")
+def generatephp(model_file):
+    model = model_from_yaml(model_file)
+    print_php(model)
+
+
+@click.command()
+@click.option("-m", "--model-file")
+def checkmodel(model_file):
+    model = model_from_yaml(model_file)
+    raise NotImplementedError()
+
+
+cli.add_command(checkmodel)
+cli.add_command(generatephp)
+cli.add_command(generatesql)
+
+
+def model_from_yaml(fname: str) -> Dict[str, Any]:
     with open(fname, "r") as f:
         data = yaml.safe_load(f)
-    data_model = build_data_model(data)
-    print_sql(data_model)
+    model = build_data_model(data)
+    return model
 
 
 def build_data_model(d: Dict[str, Any]) -> DataModel:
@@ -214,5 +250,9 @@ def print_sql(model: DataModel, f=sys.stdout):
         f.write("\n);\n\n")
 
 
+def print_php(model: DataModel, f=sys.stdout):
+    raise NotImplementedError()
+
+
 if __name__ == "__main__":
-    main()
+    cli()
