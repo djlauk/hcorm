@@ -4,6 +4,7 @@
 # See LICENSE.md for details.
 
 from dataclasses import dataclass
+from time import strftime
 from typing import Any, Dict, Generic, List, Optional, Sequence, TypeVar
 import sys
 import graphlib
@@ -267,6 +268,17 @@ def build_foreignkey(d: Dict[str, str]) -> DbForeignKey:
 
 
 def print_sql(model: DataModel, f=sys.stdout):
+    ts = strftime(r"%Y-%m-%d %H:%M:%S")
+    f.write(
+        f"""-- ----------------------------------------------------------------------
+-- hcorm generated database structure
+-- for details on hcorm see https://github.com/djlauk/hcorm
+--
+-- generated on {ts}
+-- ----------------------------------------------------------------------
+
+"""
+    )
     for tname in model.get_tablenames_sorted():
         tbl = model.tables[tname]
         f.write(f"CREATE TABLE `{tname}` (\n")
