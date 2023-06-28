@@ -75,6 +75,15 @@ class DataModel:
     typealiases: CaseInsensitiveLookup[str]
     columnsets: CaseInsensitiveLookup[CaseInsensitiveLookup[DbColumn]]
 
+    def get_tablenames_sorted(self):
+        """Get the table names in a topologically sorted order."""
+        toposort = graphlib.TopologicalSorter()
+        for tname in self.tables:
+            tbl = self.tables[tname]
+            deps = [self.tables[fk.ref_table].name for fk in tbl.foreign_keys]
+            toposort.add(tbl.name, *deps)
+        return toposort.static_order()
+
 
 @click.group()
 def cli():
@@ -104,7 +113,38 @@ def generatephp(model_file):
 @click.option("-m", "--model-file")
 def checkmodel(model_file):
     model = model_from_yaml(model_file)
-    raise NotImplementedError()
+    nerrors = 0
+
+    # check 1: check foreign keys for existing references
+    for tname in model.tables:
+        tbl = model.tables[tname]
+        for fk in tbl.foreign_keys:
+            if fk.ref_table not in model.tables:
+                print(
+                    f"ERROR: table {tname} references non-existing table: {fk.ref_table}"
+                )
+                nerrors += 1
+                continue
+            reftbl = model.tables[fk.ref_table]
+            if fk.ref_column not in reftbl.columns:
+                print(
+                    f"ERROR: table {tname} references non-existing column in table {fk.ref_table}: {fk.ref_column}"
+                )
+                nerrors += 1
+                continue
+
+    # check 2: check for cycles in table references
+    try:
+        _ = model.get_tablenames_sorted()
+    except graphlib.CycleError as err:
+        print(f"ERROR: cyclic dependencies in tables found: {err}")
+        nerrors += 1
+    except KeyError as err:
+        # silently ignore, this has been handled in check 1
+        pass
+
+    # summary
+    print(f"number of errors found: {nerrors}")
 
 
 cli.add_command(checkmodel)
@@ -227,13 +267,7 @@ def build_foreignkey(d: Dict[str, str]) -> DbForeignKey:
 
 
 def print_sql(model: DataModel, f=sys.stdout):
-    toposort = graphlib.TopologicalSorter()
-    for tname in model.tables:
-        tbl = model.tables[tname]
-        deps = [model.tables[fk.ref_table].name for fk in tbl.foreign_keys]
-        toposort.add(tbl.name, *deps)
-
-    for tname in toposort.static_order():
+    for tname in model.get_tablenames_sorted():
         tbl = model.tables[tname]
         f.write(f"CREATE TABLE `{tname}` (\n")
         for cname in tbl.columns:
