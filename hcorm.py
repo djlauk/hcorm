@@ -120,6 +120,12 @@ def checkmodel(model_file):
     for tname in model.tables:
         tbl = model.tables[tname]
         for fk in tbl.foreign_keys:
+            if fk.column not in tbl.columns:
+                print(
+                    f"ERROR: table {tname} references non-existing column in foreign key: {fk.column}"
+                )
+                nerrors += 1
+                continue
             if fk.ref_table not in model.tables:
                 print(
                     f"ERROR: table {tname} references non-existing table: {fk.ref_table}"
