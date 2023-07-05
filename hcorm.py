@@ -493,7 +493,8 @@ public function _db_helper_insert(&$pdo, $sql, $values = null)
 
 
 def php_name_for_table(tname: str) -> str:
-    return tname.capitalize()
+    # noop for now
+    return tname
 
 
 def php_name_for_column(cname: str) -> str:
