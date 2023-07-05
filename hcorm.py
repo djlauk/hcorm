@@ -455,6 +455,18 @@ public function _db_helper_insert(&$pdo, $sql, $values = null)
 \t}}\n\n"""
         )
 
+        f.write("\tprivate function _select_snippet() {\n")
+        select_fields = ",\n  ".join([f"`{tname}`.`{cname}`" for cname in tbl.columns])
+        f.write(
+            f"""\t\t$sql = <<<HERE
+SELECT
+  {select_fields}
+FROM `{tname}`
+HERE;
+"""
+        )
+        f.write("\t}\n\n")
+
         f.write("\t// ---------- CRUD operations ----------\n\n")
 
         f.write("\tpublic function dbCount(&$pdo) {\n")
@@ -474,6 +486,14 @@ public function _db_helper_insert(&$pdo, $sql, $values = null)
         f.write(
             f"\tpublic function dbLoadByPrimaryKey(&$pdo, {', '.join(pkvars)}) {{\n"
         )
+        f.write("\t\t$sql = $this->_select_snippet() . ' WHERE ")
+        f.write(" AND ".join([f"`{tname}`.`{x}` = :{x}" for x in tbl.primary_key]))
+        f.write("';\n")
+        f.write(f"\t\t$values = array({value_array});\n")
+        f.write("\t\t$dbresult = _db_helper_querySingle($pdo, $sql, $values);\n")
+        f.write("\t\tif (is_null($dbresult)) return null;\n")
+        f.write(f"\t\t$obj = {classname}::createFromArray($dbresult);\n")
+        f.write("\t\treturn $obj;\n")
         f.write("\t}\n\n")
 
         f.write("\tpublic function dbInsert(&$pdo) {\n")
