@@ -455,6 +455,39 @@ public function _db_helper_insert(&$pdo, $sql, $values = null)
 \t}}\n\n"""
         )
 
+        f.write("\t// ---------- CRUD operations ----------\n\n")
+
+        f.write("\tpublic function dbCount(&$pdo) {\n")
+        f.write(f"\t\t$sql = 'SELECT COUNT(*) FROM `{tname}`';\n")
+        f.write("\t}\n\n")
+
+        f.write("\tpublic function dbList(&$pdo, $offset=0, $pagesize=10) {\n")
+        f.write("\t}\n\n")
+
+        pkvars = ["$" + php_name_for_column(x) for x in tbl.primary_key]
+        value_array = ", ".join(
+            [
+                f"'{php_name_for_column(x)}' => ${php_name_for_column(x)}"
+                for x in tbl.primary_key
+            ]
+        )
+        f.write(
+            f"\tpublic function dbLoadByPrimaryKey(&$pdo, {', '.join(pkvars)}) {{\n"
+        )
+        f.write("\t}\n\n")
+
+        f.write("\tpublic function dbInsert(&$pdo) {\n")
+        f.write("\t}\n\n")
+
+        f.write("\tpublic function dbUpdate(&$pdo) {\n")
+        f.write("\t}\n\n")
+
+        f.write("\tpublic function dbUpsert(&$pdo) {\n")
+        f.write("\t}\n\n")
+
+        f.write("\tpublic function dbDelete(&$pdo) {\n")
+        f.write("\t}\n\n")
+
         # end of class
         f.write("}\n\n")
 
