@@ -312,6 +312,112 @@ def print_php(model: DataModel, f=sys.stdout):
 //
 // generated on {ts}
 // ----------------------------------------------------------------------
+"""
+        + r"""
+// ---------- db helpers ----------
+
+$_db_debug = false;
+
+class VersionMismatchError extends \Exception { }
+
+
+class AmbiguousQueryError extends \Exception { }
+
+
+// because "LIMIT :offset, :pagesize" will not work
+function _db_helper_limitClause($offset=0, $pagesize=50) {
+    if (!is_int($offset)) {
+        throw new Exception("offset must be integer");
+    }
+    if ($offset < 0) {
+        throw new Exception("offset must be greater or equals 0");
+    }
+    if (!is_int($pagesize)) {
+        throw new Exception("pagesize must be integer");
+    }
+    if ($pagesize < 1) {
+        throw new Exception("pagesize must be greater 0");
+    }
+    return "LIMIT ${offset}, ${pagesize}";
+}
+
+
+function _db_helper_stopWithError($errorInfo = null) {
+    $msg = "Error during DB access";
+    if ($_db_debug && !is_null($errorInfo)) {
+        $msg .= "\n\nDEBUG INFO:\n" . implode("\n", $errorInfo);
+    }
+    die($msg);
+}
+
+
+/**
+ * _db_helper_query will execute $sql in a prepared statement and return all rows as an array.
+ */
+public function _db_helper_query(&$pdo, $sql, $values = null)
+{
+    $statement = $pdo->prepare($sql);
+    if ($statement === false) {
+        _db_helper_stopWithError($this->pdo->errorInfo());
+    }
+    if ($statement->execute($values) !== true) {
+        _db_helper_stopWithError($statement->errorInfo());
+    }
+
+    $results = $statement->fetchAll();
+    if ($results === false) {
+        _db_helper_stopWithError($statement->errorInfo());
+    }
+    return $results;
+}
+
+
+/**
+ * _db_helper_querySingle will execute $sql in a prepared statement and expects 0 or 1 results.
+ * If more than 1 result is returned an AmbiguousQueryError is thrown.
+ */
+public function _db_helper_querySingle(&$pdo, $sql, $values = null)
+{
+    $results = _db_helper_query($pdo, $sql, $values);
+    $count = count($results);
+    if ($count === 0) {
+        return null;
+    }
+    if ($count > 1) {
+        throw new AmbiguousQueryError("Query returned $count results");
+    }
+    return $results[0];
+}
+
+
+/**
+ * _db_helper_execute will execute the SQL in $sql in a prepared statement.
+ */
+public function _db_helper_execute(&$pdo, $sql, $values = null)
+{
+    $statement = $pdo->prepare($sql);
+    if ($statement === false) {
+        _db_helper_stopWithError($statement->errorInfo());
+    }
+    if ($statement->execute($values) !== true) {
+        _db_helper_stopWithError($statement->errorInfo());
+    }
+}
+
+
+/**
+ * _db_helper_insert executes the SQL statement in $sql and returns the Id of the last insert.
+ *
+ * @return int Id which the last insert genertated.
+ */
+public function _db_helper_insert(&$pdo, $sql, $values = null)
+{
+    _db_helper_execute($sql, $values);
+    return $pdo->lastInsertId();
+}
+
+
+// ---------- gateway classes for tables ----------
 
 """
     )
