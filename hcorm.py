@@ -324,6 +324,12 @@ class VersionMismatchError extends \Exception { }
 class AmbiguousQueryError extends \Exception { }
 
 
+function _db_helper_enableDebug($enabled = false) {
+    global $_db_debug;
+    $_db_debug = $enabled;
+}
+
+
 // because "LIMIT :offset, :pagesize" will not work
 function _db_helper_limitClause($offset=0, $pagesize=50) {
     if (!is_int($offset)) {
@@ -343,6 +349,7 @@ function _db_helper_limitClause($offset=0, $pagesize=50) {
 
 
 function _db_helper_stopWithError($errorInfo = null) {
+    global $_db_debug;
     $msg = "Error during DB access";
     if ($_db_debug && !is_null($errorInfo)) {
         $msg .= "\n\nDEBUG INFO:\n" . implode("\n", $errorInfo);
