@@ -361,11 +361,10 @@ function _db_helper_stopWithError($errorInfo = null) {
 /**
  * _db_helper_query will execute $sql in a prepared statement and return all rows as an array.
  */
-public function _db_helper_query(&$pdo, $sql, $values = null)
-{
+function _db_helper_query(&$pdo, $sql, $values = null) {
     $statement = $pdo->prepare($sql);
     if ($statement === false) {
-        _db_helper_stopWithError($this->pdo->errorInfo());
+        _db_helper_stopWithError($pdo->errorInfo());
     }
     if ($statement->execute($values) !== true) {
         _db_helper_stopWithError($statement->errorInfo());
@@ -383,8 +382,7 @@ public function _db_helper_query(&$pdo, $sql, $values = null)
  * _db_helper_querySingle will execute $sql in a prepared statement and expects 0 or 1 results.
  * If more than 1 result is returned an AmbiguousQueryError is thrown.
  */
-public function _db_helper_querySingle(&$pdo, $sql, $values = null)
-{
+function _db_helper_querySingle(&$pdo, $sql, $values = null) {
     $results = _db_helper_query($pdo, $sql, $values);
     $count = count($results);
     if ($count === 0) {
@@ -400,11 +398,10 @@ public function _db_helper_querySingle(&$pdo, $sql, $values = null)
 /**
  * _db_helper_execute will execute the SQL in $sql in a prepared statement.
  */
-public function _db_helper_execute(&$pdo, $sql, $values = null)
-{
+function _db_helper_execute(&$pdo, $sql, $values = null) {
     $statement = $pdo->prepare($sql);
     if ($statement === false) {
-        _db_helper_stopWithError($statement->errorInfo());
+        _db_helper_stopWithError($pdo->errorInfo());
     }
     if ($statement->execute($values) !== true) {
         _db_helper_stopWithError($statement->errorInfo());
@@ -417,8 +414,7 @@ public function _db_helper_execute(&$pdo, $sql, $values = null)
  *
  * @return int Id which the last insert genertated.
  */
-public function _db_helper_insert(&$pdo, $sql, $values = null)
-{
+function _db_helper_insert(&$pdo, $sql, $values = null) {
     _db_helper_execute($sql, $values);
     return $pdo->lastInsertId();
 }
