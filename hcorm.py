@@ -427,8 +427,7 @@ function _db_helper_insert(&$pdo, $sql, $values = null) {
     for tname in model.get_tablenames_sorted():
         f.write(f"/** gateway class for table {tname} */\n")
         classname = php_name_for_table(tname)
-        f.write(f"class {classname}")
-        f.write("{\n")
+        f.write(f"class {classname} {{\n")
 
         tbl = model.tables[tname]
         fieldnames = [php_name_for_column(x) for x in tbl.columns]
@@ -439,7 +438,7 @@ function _db_helper_insert(&$pdo, $sql, $values = null) {
         f.write("\tpublic function toArray() {\n")
         f.write("\t\treturn array(\n")
         for cname, fieldname in zip(tbl.columns, fieldnames):
-            f.write(f"\t\t\t'{cname}' => ${fieldname},\n")
+            f.write(f"\t\t\t'{cname}' => $this->{fieldname},\n")
         f.write("\t\t);\n")
         f.write("\t}\n\n")
 
@@ -458,7 +457,7 @@ function _db_helper_insert(&$pdo, $sql, $values = null) {
 \t}}\n\n"""
         )
 
-        f.write("\tprivate function _select_snippet() {\n")
+        f.write("\tprivate static function _select_snippet() {\n")
         select_fields = ",\n  ".join([f"`{tname}`.`{cname}`" for cname in tbl.columns])
         f.write(
             f"""\t\t$sql = <<<HERE
@@ -468,15 +467,37 @@ FROM `{tname}`
 HERE;
 """
         )
+        f.write("\t\treturn $sql;\n")
         f.write("\t}\n\n")
 
         f.write("\t// ---------- CRUD operations ----------\n\n")
 
-        f.write("\tpublic function dbCount(&$pdo) {\n")
+        f.write("\tpublic static function dbCount(&$pdo) {\n")
         f.write(f"\t\t$sql = 'SELECT COUNT(*) FROM `{tname}`';\n")
         f.write("\t}\n\n")
 
-        f.write("\tpublic function dbList(&$pdo, $offset=0, $pagesize=10) {\n")
+        f.write(
+            "\tpublic static function dbLoadWhere(&$pdo, $values=null, $offset=0, $pagesize=10) {\n"
+        )
+        f.write(f"\t\t$sql = {classname}::_select_snippet();\n")
+        f.write("\t\tif (!is_null($values) && count($values) > 0) {\n")
+        f.write("\t\t\t$parts = array();\n")
+        f.write("\t\t\tforeach($values as $k => $v) {\n")
+        f.write(f"""\t\t\t\t$parts[] = "(`{tname}`.`${{k}}` = :${{k}})";\n""")
+        f.write("\t\t\t}\n")
+        f.write("\t\t\t$sql .= ' WHERE ' . implode(' AND ', $parts);\n")
+        f.write("\t\t}\n")
+        f.write("\t\t$sql .= ' ' . _db_helper_limitClause($offset, $pagesize);\n")
+        f.write("\t\t$dbresults = _db_helper_query($pdo, $sql, $values);\n")
+        f.write(f"\t\t$arr = array_map('{classname}::createFromArray', $dbresults);\n")
+        f.write("\t\treturn $arr;\n")
+        f.write("\t}\n\n")
+
+        f.write("\tpublic static function dbList(&$pdo, $offset=0, $pagesize=10) {\n")
+        f.write(
+            f"\t\t$arr = {classname}::dbLoadWhere($pdo, null, $offset, $pagesize);\n"
+        )
+        f.write("\t\treturn $arr;\n")
         f.write("\t}\n\n")
 
         pkvars = ["$" + php_name_for_column(x) for x in tbl.primary_key]
@@ -487,15 +508,16 @@ HERE;
             ]
         )
         f.write(
-            f"\tpublic function dbLoadByPrimaryKey(&$pdo, {', '.join(pkvars)}) {{\n"
+            f"\tpublic static function dbLoadByPrimaryKey(&$pdo, {', '.join(pkvars)}) {{\n"
         )
-        f.write("\t\t$sql = $this->_select_snippet() . ' WHERE ")
-        f.write(" AND ".join([f"`{tname}`.`{x}` = :{x}" for x in tbl.primary_key]))
-        f.write("';\n")
         f.write(f"\t\t$values = array({value_array});\n")
-        f.write("\t\t$dbresult = _db_helper_querySingle($pdo, $sql, $values);\n")
-        f.write("\t\tif (is_null($dbresult)) return null;\n")
-        f.write(f"\t\t$obj = {classname}::createFromArray($dbresult);\n")
+        f.write(f"\t\t$results = {classname}::dbLoadWhere($pdo, $values);\n")
+        f.write("\t\t$count = count($results);\n")
+        f.write("\t\tif ($count === 0) return null;\n")
+        f.write(
+            f"\t\tif ($count > 1) throw new AmbiguousQueryError('{classname}::dbLoadByPrimaryKey found more than 1 entry');\n"
+        )
+        f.write(f"\t\t$obj = $results[0];\n")
         f.write("\t\treturn $obj;\n")
         f.write("\t}\n\n")
 
@@ -510,6 +532,28 @@ HERE;
 
         f.write("\tpublic function dbDelete(&$pdo) {\n")
         f.write("\t}\n\n")
+
+        f.write("\t// ---------- navigating relationships ----------\n\n")
+
+        if len(tbl.foreign_keys) == 0:
+            f.write("\t// table has no foreign keys\n\n")
+
+        for fk in tbl.foreign_keys:
+            f.write(
+                f"\tpublic function dbLoadAllFor{fk.ref_table}(&$pdo, ${php_name_for_column(fk.column)}) {{\n"
+            )
+            f.write(
+                f"\t\t$sql = {classname}::_select_snippet() . ' WHERE `{tname}`.`{fk.column}` = :{fk.column}';\n"
+            )
+            f.write(
+                f"\t\t$values = array('{fk.column}' => ${php_name_for_column(fk.column)});\n"
+            )
+            f.write("\t\t$dbresults = _db_helper_query($pdo, $sql, $values);\n")
+            f.write(
+                f"\t\t$arr = array_map('{classname}::createFromArray', $dbresults);\n"
+            )
+            f.write("\t\treturn $arr;\n")
+            f.write("\t}\n\n")
 
         # end of class
         f.write("}\n\n")
