@@ -481,7 +481,7 @@ def print_php_gateway_class(tname: str, model: DataModel, f=sys.stdout):
     f.write(
         f"""\t\t$sql = <<<HERE
 SELECT
-{select_fields}
+  {select_fields}
 FROM `{tname}`
 HERE;
 """
@@ -493,6 +493,21 @@ HERE;
 
     f.write("\tpublic static function dbCount(&$pdo) {\n")
     f.write(f"\t\t$sql = 'SELECT COUNT(*) FROM `{tname}`';\n")
+    f.write("\t\t$dbresult = _db_helper_querySingle($pdo, $sql, $values);\n")
+    f.write("\t\treturn $dbresult[0];\n")
+    f.write("\t}\n\n")
+
+    f.write("\tpublic static function dbCountWhere(&$pdo, $values=null) {\n")
+    f.write(f"\t\t$sql = 'SELECT COUNT(*) FROM `{tname}`';\n")
+    f.write("\t\tif (!is_null($values) && count($values) > 0) {\n")
+    f.write("\t\t\t$parts = array();\n")
+    f.write("\t\t\tforeach($values as $k => $v) {\n")
+    f.write(f"""\t\t\t\t$parts[] = "(`${{k}}` = :${{k}})";\n""")
+    f.write("\t\t\t}\n")
+    f.write("\t\t\t$sql .= ' WHERE ' . implode(' AND ', $parts);\n")
+    f.write("\t\t}\n")
+    f.write("\t\t$dbresult = _db_helper_querySingle($pdo, $sql, $values);\n")
+    f.write("\t\treturn $dbresult[0];\n")
     f.write("\t}\n\n")
 
     f.write(
@@ -502,7 +517,7 @@ HERE;
     f.write("\t\tif (!is_null($values) && count($values) > 0) {\n")
     f.write("\t\t\t$parts = array();\n")
     f.write("\t\t\tforeach($values as $k => $v) {\n")
-    f.write(f"""\t\t\t\t$parts[] = "(`{tname}`.`${{k}}` = :${{k}})";\n""")
+    f.write(f"""\t\t\t\t$parts[] = "(`${{k}}` = :${{k}})";\n""")
     f.write("\t\t\t}\n")
     f.write("\t\t\t$sql .= ' WHERE ' . implode(' AND ', $parts);\n")
     f.write("\t\t}\n")
@@ -539,35 +554,67 @@ HERE;
     f.write("\t}\n\n")
 
     f.write("\tpublic function dbInsert(&$pdo) {\n")
+    f.write("\t\t$sql = <<<HERE\n")
+    f.write(f"INSERT INTO `{tname}` (\n")
+    f.write(",\n".join([f"  `{x}`" for x in fieldnames]))
+    f.write("\n) VALUES (\n")
+    f.write(",\n".join([f"  :{x}" for x in fieldnames]))
+    f.write("\n)\nHERE;\n")
+    f.write("\t\t$values = $this->toArray();\n")
+    if len(tbl.primary_key) == 1:
+        f.write("\t\t$id = _db_helper_insert($pdo, $sql, $values);\n")
+        f.write(f"\t\t$this->{tbl.primary_key[0]} = $id;\n")
+    else:
+        f.write("\t\t$__ignored__ = _db_helper_insert($pdo, $sql, $values);\n")
     f.write("\t}\n\n")
 
     f.write("\tpublic function dbUpdate(&$pdo) {\n")
+    f.write("\t\t$sql = <<<HERE\n")
+    f.write(f"UPDATE `{tname}` SET\n")
+    f.write(
+        ",\n".join([f"  `{x}` = :{x}" for x in fieldnames if x not in tbl.primary_key])
+    )
+    f.write("\nWHERE\n  ")
+    f.write("\n  AND ".join([f"(`{x}` = :{x})" for x in tbl.primary_key]))
+    f.write("\nHERE;\n")
+    f.write("\t\t$values = $this->toArray();\n")
+    f.write("\t\t_db_helper_execute($pdo, $sql, $values);\n")
     f.write("\t}\n\n")
 
     f.write("\tpublic function dbUpsert(&$pdo) {\n")
+    f.write("\t\tif (")
+    f.write(" && ".join([f"is_null($this->{x})" for x in tbl.primary_key]))
+    f.write(") {\n")
+    f.write("\t\t\t$this->dbInsert($pdo); \n")
+    f.write("\t\t} else {\n")
+    f.write("\t\t\t$this->dbUpdate($pdo);\n")
+    f.write("\t\t}\n")
     f.write("\t}\n\n")
 
     f.write("\tpublic function dbDelete(&$pdo) {\n")
+    f.write(f"\t\t$sql = 'DELETE FROM `{tname}` WHERE ")
+    f.write(" AND ".join([f"(`{x}` = :{x})" for x in tbl.primary_key]))
+    f.write("';\n")
+    f.write("\t\t$values = array(\n")
+    for x in tbl.primary_key:
+        f.write(f"\t\t\t'{x}' => $this->{x},\n")
+    f.write("\t\t);\n")
+    f.write("\t\t_db_helper_execute($pdo, $sql, $values);\n")
     f.write("\t}\n\n")
 
     f.write("\t// ---------- navigating relationships ----------\n\n")
 
     if len(tbl.foreign_keys) == 0:
-        f.write("\t// table has no foreign keys\n\n")
+        f.write(f"\t// table {tname} has no foreign keys\n\n")
 
     for fk in tbl.foreign_keys:
         f.write(
-            f"\tpublic function dbLoadAllFor{fk.ref_table}(&$pdo, ${php_name_for_column(fk.column)}) {{\n"
+            f"\tpublic static function dbLoadAllFor{fk.ref_table}(&$pdo, ${php_name_for_column(fk.column)}, $offset=0, $pagesize=10) {{\n"
         )
         f.write(
-            f"\t\t$sql = {classname}::_select_snippet() . ' WHERE `{tname}`.`{fk.column}` = :{fk.column}';\n"
+            f"\t\t$dbresults = {classname}::dbLoadWhere($pdo, array('{fk.column}' => ${php_name_for_column(fk.column)}), $offset, $pagesize);\n"
         )
-        f.write(
-            f"\t\t$values = array('{fk.column}' => ${php_name_for_column(fk.column)});\n"
-        )
-        f.write("\t\t$dbresults = _db_helper_query($pdo, $sql, $values);\n")
-        f.write(f"\t\t$arr = array_map('{classname}::createFromArray', $dbresults);\n")
-        f.write("\t\treturn $arr;\n")
+        f.write("\t\treturn $dbresults;\n")
         f.write("\t}\n\n")
 
     # end of class
