@@ -426,7 +426,7 @@ function _db_helper_execute(&$pdo, $sql, $values = null) {
  * @return int Id which the last insert genertated.
  */
 function _db_helper_insert(&$pdo, $sql, $values = null) {
-    _db_helper_execute($sql, $values);
+    _db_helper_execute($pdo, $sql, $values);
     return $pdo->lastInsertId();
 }
 
